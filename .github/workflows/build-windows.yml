@@ -1,0 +1,41 @@
+name: Build Windows Server (forapi)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-2022
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+        with:
+          ref: forapi
+          submodules: recursive
+
+      - name: Patch Cargo.toml for Windows build
+        shell: pwsh
+        run: |
+          $file = "libs/hbb_common/Cargo.toml"
+          if (Test-Path $file) {
+            $content = Get-Content $file -Raw
+            if ($content -notmatch 'sysinfoapi') {
+              $content = $content -replace '("memoryapi")', '$1, "sysinfoapi"'
+              Set-Content $file $content -NoNewline
+            }
+          }
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.85.0
+          targets: x86_64-pc-windows-msvc
+
+      - name: Build
+        run: cargo build --release --all-features --target x86_64-pc-windows-msvc
+
+      - name: Upload hbbs.exe
+        uses: actions/upload-artifact@v4
+        with:
+          name: rustdesk-server-windows-forapi
+          path: target/x86_64-pc-windows-msvc/release/hbbs.exe
